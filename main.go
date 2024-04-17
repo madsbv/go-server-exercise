@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync"
 )
 
 func main() {
@@ -27,5 +28,8 @@ func main() {
 }
 
 type apiConfig struct {
-	fileserverHits int
+	fileserverHits struct {
+		count int
+		mux   sync.RWMutex
+	}
 }

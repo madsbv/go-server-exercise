@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"slices"
+	"strings"
 )
 
 func validateChirp(w http.ResponseWriter, r *http.Request) {
@@ -13,7 +15,7 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 	}
 	type returnValid struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -32,7 +34,19 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Chirp is valid, return 200
-	respBody := returnValid{Valid: true}
+	// Chirp has valid length, proceed to clean it up
+	// Replace the following with '****': kerfuffle, sharbert, fornax
+	badWords := []string{"kerfuffle", "sharbert", "fornax"}
+
+	body := strings.TrimSpace(params.Body)
+	words := strings.Split(body, " ")
+	for i, w := range words {
+		if slices.Contains(badWords, strings.ToLower(w)) {
+			words[i] = "****"
+		}
+	}
+	CleanedBody := strings.Join(words, " ")
+
+	respBody := returnValid{CleanedBody}
 	respondWithJSON(w, 200, respBody)
 }

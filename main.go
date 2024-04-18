@@ -13,9 +13,9 @@ func main() {
 	smux := http.NewServeMux()
 	apiCfg := apiConfig{}
 	smux.Handle(filepathRoot, apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
-	smux.HandleFunc("/healthz", healthz)
-	smux.HandleFunc("/metrics", apiCfg.metrics)
-	smux.HandleFunc("/reset", apiCfg.reset)
+	smux.HandleFunc("GET /api/healthz", healthz)
+	smux.HandleFunc("GET /api/metrics", apiCfg.metrics)
+	smux.HandleFunc("GET /api/reset", apiCfg.reset)
 
 	corsMux := middlewareCors(smux)
 

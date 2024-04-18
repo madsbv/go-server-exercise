@@ -21,7 +21,15 @@ func (cfg *apiConfig) metrics(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	cfg.fileserverHits.mux.RLock()
 	defer cfg.fileserverHits.mux.RUnlock()
-	io.WriteString(w, fmt.Sprintf("Hits: %v", cfg.fileserverHits.count))
+	io.WriteString(w, fmt.Sprintf(`<html>
+
+<body>
+    <h1>Welcome, Chirpy Admin</h1>
+    <p>Chirpy has been visited %d times!</p>
+</body>
+
+</html>
+`, cfg.fileserverHits.count))
 }
 
 func (cfg *apiConfig) reset(_ http.ResponseWriter, _ *http.Request) {

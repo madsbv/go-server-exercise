@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func validateChirp(w http.ResponseWriter, r *http.Request) {
+func handleValidateChirp(w http.ResponseWriter, r *http.Request) {
 	// We always return JSON from this method
 	w.Header().Set("Content-Type", "application/json")
 	type parameters struct {

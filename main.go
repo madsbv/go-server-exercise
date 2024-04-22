@@ -12,11 +12,11 @@ func main() {
 
 	smux := http.NewServeMux()
 	apiCfg := apiConfig{}
-	smux.Handle(filepathRoot, apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
+	smux.Handle(filepathRoot, apiCfg.middlewareMetricsInc(http.FileServer(http.Dir("."))))
 	smux.HandleFunc("GET /api/healthz", healthz)
 	smux.HandleFunc("GET /admin/metrics", apiCfg.metrics)
 	smux.HandleFunc("GET /api/reset", apiCfg.reset)
-	smux.HandleFunc("POST /api/validate_chirp", validateChirp)
+	smux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
 
 	corsMux := middlewareCors(smux)
 

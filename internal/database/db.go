@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"errors"
+	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
 	"slices"
@@ -14,9 +15,19 @@ type Chirp struct {
 	Id   int    `json:"id"`
 }
 
-type User struct {
+type user struct {
+	Email string `json:"email"`
+	Hash  []byte `json:"hash"`
+	Id    int    `json:"id"`
+}
+
+type SafeUser struct {
 	Email string `json:"email"`
 	Id    int    `json:"id"`
+}
+
+func (u user) clean() SafeUser {
+	return SafeUser{Email: u.Email, Id: u.Id}
 }
 
 type DB struct {
@@ -25,14 +36,18 @@ type DB struct {
 }
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]User  `json:"users"`
+	Users  map[int]user  `json:"users"`
 }
 
-func (db *DB) CreateUser(email string) (User, error) {
-	user := User{}
+func (db *DB) CreateUser(email string, password string) (SafeUser, error) {
+	user := user{}
+	_, err := db.getUserByEmail(email)
+	if err == nil {
+		return user.clean(), errors.New("User with given email already exists")
+	}
 	dbs, err := db.load()
 	if err != nil {
-		return user, err
+		return user.clean(), err
 	}
 
 	// NOTE: This should be valid as long as we only modify the database here, but might need to be made more robust later if we start deleting users
@@ -40,6 +55,10 @@ func (db *DB) CreateUser(email string) (User, error) {
 
 	user.Email = email
 	user.Id = id
+	user.Hash, err = bcrypt.GenerateFromPassword([]byte(password), 0)
+	if err != nil {
+		log.Printf("Error hashing password when adding user: %v", user)
+	}
 
 	dbs.Users[id] = user
 
@@ -47,42 +66,70 @@ func (db *DB) CreateUser(email string) (User, error) {
 	if err != nil {
 		log.Printf("Error writing database when adding user: %v", user)
 	}
-	return user, err
+	return user.clean(), err
 }
 
-func (db *DB) GetSortedUsers() ([]User, error) {
+func (db *DB) GetSortedUsers() ([]SafeUser, error) {
 	dbs, err := db.load()
 	if err != nil {
 		log.Printf("Error loading database while getting users: %v", err)
 		return nil, err
 	}
 
-	users := make([]User, len(dbs.Users))
+	users := make([]SafeUser, len(dbs.Users))
 	i := 0
 	for k := range dbs.Users {
-		users[i] = dbs.Users[k]
+		users[i] = dbs.Users[k].clean()
 		i++
 	}
 
-	slices.SortFunc(users, func(a, b User) int {
+	slices.SortFunc(users, func(a, b SafeUser) int {
 		return a.Id - b.Id
 	})
 	return users, nil
 }
 
-func (db *DB) GetUser(id int) (User, error) {
+func (db *DB) GetUser(id int) (SafeUser, error) {
 	dbs, err := db.load()
 	if err != nil {
-		return User{}, err
+		return SafeUser{}, err
 	}
 
 	user, exists := dbs.Users[id]
 	if !exists {
-		return User{}, errors.New("User with requested id doesn't exist")
+		return SafeUser{}, errors.New("User with requested id doesn't exist")
 	}
 
-	return user, nil
+	return user.clean(), nil
 }
+
+func (db *DB) getUserByEmail(email string) (user, error) {
+	dbs, err := db.load()
+	if err != nil {
+		return user{}, err
+	}
+	for _, v := range dbs.Users {
+		if v.Email == email {
+			return v, nil
+		}
+	}
+	return user{}, errors.New("User with requested email doesn't exist")
+}
+
+func (db *DB) ValidateLogin(email, password string) (SafeUser, error) {
+	safeUser := SafeUser{}
+	user, err := db.getUserByEmail(email)
+	if err != nil {
+		return safeUser, errors.New("User email not found")
+	}
+
+	err = bcrypt.CompareHashAndPassword(user.Hash, []byte(password))
+	if err == nil {
+		safeUser = user.clean()
+	}
+	return safeUser, err
+}
+
 func (db *DB) CreateChirp(body string) (Chirp, error) {
 	chirp := Chirp{}
 	dbs, err := db.load()
@@ -155,7 +202,7 @@ func NewDB(path string) (*DB, error) {
 
 func (db *DB) ensure() error {
 	log.Printf("Ensure that database at %v exists", db.path)
-	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]User)}
+	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]user)}
 	_, err := os.ReadFile(db.path)
 	if err != nil {
 		err = db.write(dbs)

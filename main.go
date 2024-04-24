@@ -40,6 +40,7 @@ func main() {
 	smux.Handle("POST /api/users", handlePostUsers(db))
 	smux.Handle("GET /api/users", handleGetAllUsers(db))
 	smux.Handle("GET /api/users/{id}", handleGetUser(db))
+	smux.Handle("POST /api/login", handleLogin(db))
 
 	corsMux := middlewareCors(smux)
 

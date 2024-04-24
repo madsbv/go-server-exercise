@@ -9,14 +9,13 @@ import (
 	"github.com/madsbv/boot-dev-go-server/internal/database"
 )
 
-type User = database.User
-
 func handlePostUsers(db *database.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// We always return JSON from this method
 		w.Header().Set("Content-Type", "application/json")
 		type parameters struct {
-			Email string `json:"email"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
 		}
 
 		decoder := json.NewDecoder(r.Body)
@@ -24,12 +23,12 @@ func handlePostUsers(db *database.DB) http.Handler {
 		err := decoder.Decode(&params)
 		log.Printf("Handling: %s", params.Email)
 		if err != nil {
-			log.Printf("Error decoding user parameters: %s", err)
+			log.Printf("Error decoding user parameters: %s\n%v", err, params)
 			respondWithError(w, 500, "Failed to decode request")
 			return
 		}
 
-		user, err := db.CreateUser(params.Email)
+		user, err := db.CreateUser(params.Email, params.Password)
 		if err != nil {
 			log.Printf("Database error when creating user: %v", err)
 			respondWithError(w, 500, "Error handling request")

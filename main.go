@@ -7,14 +7,23 @@ import (
 	"os"
 	"sync"
 
+	"github.com/joho/godotenv"
 	"github.com/madsbv/boot-dev-go-server/internal/database"
 )
 
 func main() {
+	filepathRoot := "/app/"
 	dbg := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
-	filepathRoot := "/app/"
+	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
+	apiCfg := apiConfig{}
+	apiCfg.jwtSecret = jwtSecret
+
 	port := "8080"
 	dbPath := "database.json"
 
@@ -28,28 +37,17 @@ func main() {
 		log.Fatal("Failed to create database connection: ", err)
 	}
 
-	smux := http.NewServeMux()
-	apiCfg := apiConfig{}
-	smux.Handle(filepathRoot, apiCfg.middlewareMetricsInc(http.FileServer(http.Dir("."))))
-	smux.HandleFunc("GET /api/healthz", healthz)
-	smux.HandleFunc("GET /admin/metrics", apiCfg.metrics)
-	smux.HandleFunc("GET /api/reset", apiCfg.reset)
-	smux.Handle("POST /api/chirps", handlePostChirps(db))
-	smux.Handle("GET /api/chirps", handleGetAllChirps(db))
-	smux.Handle("GET /api/chirps/{id}", handleGetChirp(db))
-	smux.Handle("POST /api/users", handlePostUsers(db))
-	smux.Handle("GET /api/users", handleGetAllUsers(db))
-	smux.Handle("GET /api/users/{id}", handleGetUser(db))
-	smux.Handle("POST /api/login", handleLogin(db))
+	logger := log.New(os.Stdout, "http: ", log.LstdFlags)
+	logger.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 
-	corsMux := middlewareCors(smux)
+	smux := initRoutes(db, &apiCfg, filepathRoot)
 
 	server := http.Server{
-		Addr:    "localhost:" + port,
-		Handler: corsMux,
+		Addr:     "localhost:" + port,
+		Handler:  tracing(logging(logger, middlewareCors(smux))),
+		ErrorLog: logger,
 	}
-	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
-	log.Fatal(server.ListenAndServe())
+	logger.Fatal(server.ListenAndServe())
 }
 
 type apiConfig struct {
@@ -57,4 +55,5 @@ type apiConfig struct {
 		count int
 		mux   sync.RWMutex
 	}
+	jwtSecret []byte
 }

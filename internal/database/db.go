@@ -39,34 +39,53 @@ type DBStructure struct {
 	Users  map[int]user  `json:"users"`
 }
 
-func (db *DB) CreateUser(email string, password string) (SafeUser, error) {
-	user := user{}
-	_, err := db.getUserByEmail(email)
-	if err == nil {
-		return user.clean(), errors.New("User with given email already exists")
+func (db *DB) writeUser(email, password string, newUser bool, id int) (SafeUser, error) {
+	if !newUser && id <= 0 {
+		log.Fatal("Invalid operation: Overwrite user with negative id:", email, password, id)
+	}
+	if newUser && id != 0 {
+		log.Fatal("Invalid operation: Tried to specify the id when creating new user:", email, password, id)
+	}
+
+	var user user
+	if newUser {
+		_, err := db.getUserByEmail(email)
+		if err == nil {
+			return user.clean(), errors.New("User with given email already exists")
+		}
 	}
 	dbs, err := db.load()
 	if err != nil {
 		return user.clean(), err
 	}
+	if newUser {
+		id = (len(dbs.Users) + 1)
+	}
 
 	// NOTE: This should be valid as long as we only modify the database here, but might need to be made more robust later if we start deleting users
-	id := len(dbs.Users) + 1
 
 	user.Email = email
 	user.Id = id
 	user.Hash, err = bcrypt.GenerateFromPassword([]byte(password), 0)
 	if err != nil {
-		log.Printf("Error hashing password when adding user: %v", user)
+		log.Printf("Error hashing password when writing user: %v", user)
 	}
 
 	dbs.Users[id] = user
 
 	err = db.write(dbs)
 	if err != nil {
-		log.Printf("Error writing database when adding user: %v", user)
+		log.Printf("Error writing database when writing user: %v", user)
 	}
 	return user.clean(), err
+}
+
+func (db *DB) CreateUser(email, password string) (SafeUser, error) {
+	return db.writeUser(email, password, true, 0)
+}
+
+func (db *DB) UpdateUser(id int, email, password string) (SafeUser, error) {
+	return db.writeUser(email, password, false, id)
 }
 
 func (db *DB) GetSortedUsers() ([]SafeUser, error) {

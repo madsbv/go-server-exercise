@@ -15,8 +15,6 @@ type Chirp = database.Chirp
 
 func handlePostChirps(db *database.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// We always return JSON from this method
-		w.Header().Set("Content-Type", "application/json")
 		type parameters struct {
 			Body string `json:"body"`
 		}

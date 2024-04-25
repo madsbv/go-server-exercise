@@ -12,7 +12,7 @@ import (
 func logging(logger *log.Logger, next http.Handler) http.Handler {
 	start := time.Now()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := w.Header().Get("X-Request-Id")
+		requestID := getRequestID(w)
 		if requestID == "" {
 			requestID = "unknown"
 		}
@@ -47,4 +47,8 @@ func (rg *requestIDGenerator) getID() string {
 	newID := rg.nextID
 	rg.nextID++
 	return fmt.Sprint(newID)
+}
+
+func getRequestID(w http.ResponseWriter) string {
+	return w.Header().Get("X-Request-Id")
 }

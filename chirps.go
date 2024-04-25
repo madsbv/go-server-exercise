@@ -25,13 +25,13 @@ func handlePostChirps(db *database.DB) http.Handler {
 		log.Printf("Handling: %s", params.Body)
 		if err != nil {
 			log.Printf("Error decoding chirp parameters: %s", err)
-			respondWithError(w, 500, "Failed to decode request")
+			respondWithError(w, 500, "Failed to decode request", err)
 			return
 		}
 
 		if l := len(params.Body); l > 140 {
 			log.Printf("Received chirp with %d > 140 characters, rejected", l)
-			respondWithError(w, 400, "Chirp is too long")
+			respondWithError(w, 400, "Chirp is too long", err)
 			return
 		}
 
@@ -40,7 +40,7 @@ func handlePostChirps(db *database.DB) http.Handler {
 		chirp, err := db.CreateChirp(body)
 		if err != nil {
 			log.Printf("Database error when creating chirp: %v", err)
-			respondWithError(w, 500, "Error handling request")
+			respondWithError(w, 500, "Error handling request", err)
 			return
 		}
 
@@ -53,7 +53,7 @@ func handleGetAllChirps(db *database.DB) http.Handler {
 		chirps, err := db.GetSortedChirps()
 		if err != nil {
 			log.Println("Error getting list of chirps")
-			respondWithError(w, 500, "Error handling request")
+			respondWithError(w, 500, "Error handling request", err)
 		}
 		respondWithJSON(w, 200, chirps)
 	})
@@ -71,7 +71,7 @@ func handleGetChirp(db *database.DB) http.Handler {
 		if err != nil {
 			log.Println("Error getting chirp with id", id, err)
 			// NOTE: It might be worth distinguishing between internal database error, and invalid id in request. How to do that?
-			respondWithError(w, 404, "Error handling request")
+			respondWithError(w, 404, "Error handling request", err)
 		}
 
 		respondWithJSON(w, 200, chirp)

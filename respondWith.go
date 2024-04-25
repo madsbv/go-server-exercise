@@ -6,7 +6,10 @@ import (
 	"net/http"
 )
 
-func respondWithError(w http.ResponseWriter, code int, msg string) {
+func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
+	rid := getRequestID(w)
+	log.Println(rid, "Responding with error message", msg, "\n\033[31;1mError:\033[0m", err)
+
 	type returnErr struct {
 		Error string `json:"error"`
 	}
@@ -25,11 +28,12 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	rid := getRequestID(w)
 	dat, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Error marshalling some payload")
-		respondWithError(w, 500, "Something went wrong")
+		respondWithError(w, 500, "Error encoding response payload", err)
 	}
+	log.Println(rid, "Responding with json payload and status code", code)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(dat)

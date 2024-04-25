@@ -15,6 +15,10 @@ import (
 
 func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rid := getRequestID(w)
+
+		expirationSeconds := 60 * 60 * 24
+
 		type parameters struct {
 			Email      string `json:"email"`
 			Password   string `json:"password"`
@@ -30,34 +34,33 @@ func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
 		decoder := json.NewDecoder(r.Body)
 		params := parameters{}
 		err := decoder.Decode(&params)
-		log.Printf("Handling: %s", params.Email)
+		log.Println(rid, "handleLogin email", params.Email)
 		if err != nil {
-			log.Printf("Error decoding user parameters: %s\n%v", err, params)
-			respondWithError(w, 500, "Failed to decode request")
+			log.Println(rid, "Error decoding user parameters", err, params)
+			respondWithError(w, 500, "Failed to decode request", err)
 			return
 		}
 
 		user, err := db.ValidateLogin(params.Email, params.Password)
 		if err != nil {
-			log.Printf("Error while validating login for user: %v", err)
-			respondWithError(w, 401, "Error handling request")
+			log.Println(rid, "Error while validating login", err)
+			respondWithError(w, 401, "Error handling request", err)
 			return
 		}
 
-		expiration := 60 * 60 * 24
-		if params.Expiration > 0 && params.Expiration < expiration {
-			expiration = params.Expiration
+		if params.Expiration > 0 && params.Expiration < expirationSeconds {
+			expirationSeconds = params.Expiration
 		}
 
 		jwt, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 			Issuer:    "chirpy",
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiration) * time.Second)),
-			Subject:   string(user.Id),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expirationSeconds) * time.Second)),
+			Subject:   fmt.Sprint(user.Id),
 		}).SignedString(jwtSecret)
 		if err != nil {
-			log.Printf("Error creating jwt for user:", err, params)
-			respondWithError(w, 500, "Error handling request")
+			log.Printf(rid, "Error creating jwt", err, params)
+			respondWithError(w, 500, "Error handling request", err)
 			return
 		}
 
@@ -72,6 +75,7 @@ func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
 
 func handlePutUsers(db *database.DB, jwtSecret []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rid := getRequestID(w)
 		type parameters struct {
 			Email    string `json:"email"`
 			Password string `json:"password"`
@@ -79,47 +83,42 @@ func handlePutUsers(db *database.DB, jwtSecret []byte) http.Handler {
 		decoder := json.NewDecoder(r.Body)
 		params := parameters{}
 		err := decoder.Decode(&params)
-		log.Printf("Handling request to update email to: %s", params.Email)
+		log.Println(rid, "handlePutUsers", params.Email)
 		if err != nil {
-			log.Printf("Error decoding user parameters: %s\n%v", err, params)
-			respondWithError(w, 500, "Failed to decode request")
+			respondWithError(w, 500, "Failed to decode request body", err)
 			return
 		}
 
 		tokenString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		log.Printf("Received token: %v", tokenString)
+		log.Println(rid, "Received token", tokenString)
 
 		// The keyFunc should take the parsed but unverified token, do any checks to make sure the token is of a valid format, and then return the signing key to verify the authenticity of the token against.
-		token, err := jwt.ParseWithClaims(tokenString, jwt.RegisteredClaims{Issuer: "chirpy"}, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-			}
-
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return jwtSecret, nil
-		})
+		}, jwt.WithValidMethods([]string{"HS256"}))
 		if err != nil {
-			respondWithError(w, 401, "Invalid token")
+			respondWithError(w, 401, "Failed to parse token", err)
 			return
 		}
 
 		var idStr string
 		idStr, err = token.Claims.GetSubject()
 		if err != nil {
-			respondWithError(w, 401, "Invalid token")
+			respondWithError(w, 401, "No user ID given", err)
 			return
 		}
 
 		var id int
 		id, err = strconv.Atoi(idStr)
 		if err != nil {
-			respondWithError(w, 401, "Invalid token")
+			respondWithError(w, 401, "Given user ID is not a number", err)
 			return
 		}
 
 		var user database.SafeUser
 		user, err = db.UpdateUser(id, params.Email, params.Password)
 		if err != nil {
-			respondWithError(w, 500, "Failed to decode request")
+			respondWithError(w, 500, "Failed to update user (ID might be incorrect)", err)
 			return
 		}
 		respondWithJSON(w, 200, user)

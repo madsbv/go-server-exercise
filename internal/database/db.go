@@ -41,6 +41,8 @@ type DBStructure struct {
 	Chirps        map[int]Chirp        `json:"chirps"`
 	Users         map[int]user         `json:"users"`
 	RevokedTokens map[string]time.Time `json:"revoked_tokens"`
+	// Cheap way to get unique ids
+	NextChirpId int `json:"nextChirpId"`
 }
 
 func (db *DB) writeUser(email, password string, newUser bool, id int) (SafeUser, error) {
@@ -160,8 +162,8 @@ func (db *DB) CreateChirp(body string, authorId int) (Chirp, error) {
 		return chirp, err
 	}
 
-	// NOTE: This should be valid as long as we only modify the database here, but might need to be made more robust later if we start deleting chirps
-	id := len(dbs.Chirps) + 1
+	id := dbs.NextChirpId
+	dbs.NextChirpId++
 
 	chirp.Body = body
 	chirp.Id = id
@@ -235,7 +237,7 @@ func NewDB(path string) (*DB, error) {
 
 func (db *DB) ensure() error {
 	log.Printf("Ensure that database at %v exists", db.path)
-	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]user), RevokedTokens: make(map[string]time.Time)}
+	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]user), RevokedTokens: make(map[string]time.Time), NextChirpId: 1}
 	_, err := os.ReadFile(db.path)
 	if err != nil {
 		err = db.write(dbs)

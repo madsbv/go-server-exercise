@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"slices"
@@ -19,18 +20,20 @@ type Chirp struct {
 }
 
 type user struct {
-	Email string `json:"email"`
-	Hash  []byte `json:"hash"`
-	Id    int    `json:"id"`
+	Email       string `json:"email"`
+	Hash        []byte `json:"hash"`
+	Id          int    `json:"id"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 type SafeUser struct {
-	Email string `json:"email"`
-	Id    int    `json:"id"`
+	Email       string `json:"email"`
+	Id          int    `json:"id"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 func (u user) clean() SafeUser {
-	return SafeUser{Email: u.Email, Id: u.Id}
+	return SafeUser{Email: u.Email, Id: u.Id, IsChirpyRed: u.IsChirpyRed}
 }
 
 type DB struct {
@@ -45,39 +48,30 @@ type DBStructure struct {
 	NextChirpId int `json:"nextChirpId"`
 }
 
-func (db *DB) writeUser(email, password string, newUser bool, id int) (SafeUser, error) {
-	if !newUser && id <= 0 {
-		log.Fatal("Invalid operation: Overwrite user with negative id:", email, password, id)
+func (db *DB) writeUser(user user, password string, newUser bool) (SafeUser, error) {
+	if !newUser && user.Id <= 0 {
+		log.Fatal("Invalid operation: Overwrite user with negative id:", user)
 	}
-	if newUser && id != 0 {
-		log.Fatal("Invalid operation: Tried to specify the id when creating new user:", email, password, id)
+	if newUser && user.Id != 0 {
+		log.Fatal("Invalid operation: Tried to specify the id when creating new user:", user)
 	}
 
-	var user user
-	if newUser {
-		_, err := db.getUserByEmail(email)
-		if err == nil {
-			return user.clean(), errors.New("User with given email already exists")
-		}
-	}
 	dbs, err := db.load()
 	if err != nil {
 		return user.clean(), err
 	}
 	if newUser {
-		id = (len(dbs.Users) + 1)
+		user.Id = (len(dbs.Users) + 1)
 	}
 
 	// NOTE: This should be valid as long as we only modify the database here, but might need to be made more robust later if we start deleting users
 
-	user.Email = email
-	user.Id = id
 	user.Hash, err = bcrypt.GenerateFromPassword([]byte(password), 0)
 	if err != nil {
 		log.Printf("Error hashing password when writing user: %v", user)
 	}
 
-	dbs.Users[id] = user
+	dbs.Users[user.Id] = user
 
 	err = db.write(dbs)
 	if err != nil {
@@ -87,11 +81,39 @@ func (db *DB) writeUser(email, password string, newUser bool, id int) (SafeUser,
 }
 
 func (db *DB) CreateUser(email, password string) (SafeUser, error) {
-	return db.writeUser(email, password, true, 0)
+	_, err := db.getUserByEmail(email)
+	if err == nil {
+		return SafeUser{}, errors.New("User with given email already exists")
+	}
+	user := user{Email: email}
+	return db.writeUser(user, password, true)
 }
 
 func (db *DB) UpdateUser(id int, email, password string) (SafeUser, error) {
-	return db.writeUser(email, password, false, id)
+	suser, err := db.GetUser(id)
+	if err == nil {
+		return SafeUser{}, errors.New("User with given id not found")
+	}
+	user := user{Email: email, Id: id, IsChirpyRed: suser.IsChirpyRed}
+	return db.writeUser(user, password, false)
+}
+
+func (db *DB) UpgradeUser(id int) error {
+	dbs, err := db.load()
+	if err != nil {
+		return err
+	}
+
+	user, exists := dbs.Users[id]
+	if !exists {
+		return fmt.Errorf("User doesn't exist")
+	}
+
+	user.IsChirpyRed = true
+	// NOTE: You can't update map values, only reassign them. So either we rewrite entries every time, or use maps of pointers.
+	dbs.Users[id] = user
+	db.write(dbs)
+	return nil
 }
 
 func (db *DB) GetSortedUsers() ([]SafeUser, error) {

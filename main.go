@@ -20,9 +20,7 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
-	apiCfg := apiConfig{}
-	apiCfg.jwtSecret = jwtSecret
+	apiCfg := apiConfig{jwtSecret: []byte(os.Getenv("JWT_SECRET")), polkaSecret: os.Getenv("POLKA_SECRET")}
 
 	port := "8080"
 	dbPath := "database.json"
@@ -55,5 +53,6 @@ type apiConfig struct {
 		count int
 		mux   sync.RWMutex
 	}
-	jwtSecret []byte
+	jwtSecret   []byte
+	polkaSecret string
 }

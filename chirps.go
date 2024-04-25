@@ -70,6 +70,22 @@ func handleGetAllChirps(db *database.DB) http.Handler {
 			log.Println("Error getting list of chirps")
 			respondWithError(w, 500, "Error handling request", err)
 		}
+
+		if s := r.URL.Query().Get("author_id"); len(s) > 0 {
+			authorId, err := strconv.Atoi(s)
+			if err != nil {
+				respondWithError(w, 404, "Given author id does not look like a number", err)
+			}
+			authorChirps := make([]database.Chirp, 0)
+			for _, c := range chirps {
+				if c.AuthorId == authorId {
+					authorChirps = append(authorChirps, c)
+				}
+			}
+			chirps = authorChirps
+
+		}
+
 		respondWithJSON(w, 200, chirps)
 	})
 }

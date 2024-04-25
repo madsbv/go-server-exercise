@@ -18,7 +18,7 @@ const expirationRefreshSeconds = 60 * 60 * 24 * 60 // 60 days
 const accessIssuer = "chirpy-access"
 const refreshIssuer = "chirpy-refresh"
 
-func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
+func handlePostLogin(db *database.DB, jwtSecret []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rid := getRequestID(w)
 
@@ -31,6 +31,7 @@ func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
 		type response struct {
 			Email        string `json:"email"`
 			Id           int    `json:"id"`
+			IsChirpyRed  bool   `json:"is_chirpy_red"`
 			Token        string `json:"token"`
 			RefreshToken string `json:"refresh_token"`
 		}
@@ -69,6 +70,7 @@ func handleLogin(db *database.DB, jwtSecret []byte) http.Handler {
 		respondWithJSON(w, 200, response{
 			Email:        user.Email,
 			Id:           user.Id,
+			IsChirpyRed:  user.IsChirpyRed,
 			Token:        jwt,
 			RefreshToken: jwtRefresh,
 		})

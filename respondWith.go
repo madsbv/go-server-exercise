@@ -8,7 +8,10 @@ import (
 
 func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	rid := getRequestID(w)
-	log.Println(rid, "Responding with error message", msg, "\n\033[31;1mError:\033[0m", err)
+	log.Println(rid, "Responding with error message", msg)
+	if err != nil {
+		log.Println(rid, "\033[31;1mError:\033[0m", err)
+	}
 
 	type returnErr struct {
 		Error string `json:"error"`

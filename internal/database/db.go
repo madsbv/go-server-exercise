@@ -3,16 +3,19 @@ package database
 import (
 	"encoding/json"
 	"errors"
-	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
 	"slices"
 	"sync"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Chirp struct {
-	Body string `json:"body"`
-	Id   int    `json:"id"`
+	Body     string `json:"body"`
+	Id       int    `json:"id"`
+	AuthorId int    `json:"author_id"`
 }
 
 type user struct {
@@ -35,8 +38,9 @@ type DB struct {
 	mux  *sync.RWMutex
 }
 type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]user  `json:"users"`
+	Chirps        map[int]Chirp        `json:"chirps"`
+	Users         map[int]user         `json:"users"`
+	RevokedTokens map[string]time.Time `json:"revoked_tokens"`
 }
 
 func (db *DB) writeUser(email, password string, newUser bool, id int) (SafeUser, error) {
@@ -149,7 +153,7 @@ func (db *DB) ValidateLogin(email, password string) (SafeUser, error) {
 	return safeUser, err
 }
 
-func (db *DB) CreateChirp(body string) (Chirp, error) {
+func (db *DB) CreateChirp(body string, authorId int) (Chirp, error) {
 	chirp := Chirp{}
 	dbs, err := db.load()
 	if err != nil {
@@ -161,6 +165,7 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 
 	chirp.Body = body
 	chirp.Id = id
+	chirp.AuthorId = authorId
 
 	dbs.Chirps[id] = chirp
 
@@ -205,6 +210,15 @@ func (db *DB) GetChirp(id int) (Chirp, error) {
 	return chirp, nil
 }
 
+func (db *DB) DeleteChirp(id int) error {
+	dbs, err := db.load()
+	if err != nil {
+		return err
+	}
+	delete(dbs.Chirps, id)
+	return nil
+}
+
 func NewDB(path string) (*DB, error) {
 	log.Println("Creating new database connection")
 	db := DB{
@@ -221,7 +235,7 @@ func NewDB(path string) (*DB, error) {
 
 func (db *DB) ensure() error {
 	log.Printf("Ensure that database at %v exists", db.path)
-	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]user)}
+	dbs := DBStructure{Chirps: make(map[int]Chirp), Users: make(map[int]user), RevokedTokens: make(map[string]time.Time)}
 	_, err := os.ReadFile(db.path)
 	if err != nil {
 		err = db.write(dbs)
@@ -261,5 +275,24 @@ func (db *DB) write(dbs DBStructure) error {
 	if err != nil {
 		log.Println("Error writing to database:", err)
 	}
+	return err
+}
+
+func (db *DB) TokenRevoked(tokenString string) (bool, error) {
+	dbs, err := db.load()
+	if err != nil {
+		return false, err
+	}
+	_, ok := dbs.RevokedTokens[tokenString]
+	return ok, nil
+}
+
+func (db *DB) RevokeToken(tokenString string, time time.Time) error {
+	dbs, err := db.load()
+	if err != nil {
+		return err
+	}
+	dbs.RevokedTokens[tokenString] = time
+	err = db.write(dbs)
 	return err
 }

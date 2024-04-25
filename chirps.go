@@ -13,15 +13,30 @@ import (
 
 type Chirp = database.Chirp
 
-func handlePostChirps(db *database.DB) http.Handler {
+func handlePostChirps(db *database.DB, jwtSecret []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rid := getRequestID(w)
+		tokenString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		idStr, err := checkUserAuthenticated(tokenString, jwtSecret)
+		log.Println(rid, "handlePostChirps for AuthorId", idStr, tokenString)
+		if err != nil {
+			respondWithError(w, 401, "Authentication failed", err)
+			return
+		}
+
+		authorId, err := strconv.Atoi(idStr)
+		if err != nil {
+			respondWithError(w, 401, "Given user ID is not a number", err)
+			return
+		}
+
 		type parameters struct {
 			Body string `json:"body"`
 		}
 
 		decoder := json.NewDecoder(r.Body)
 		params := parameters{}
-		err := decoder.Decode(&params)
+		err = decoder.Decode(&params)
 		log.Printf("Handling: %s", params.Body)
 		if err != nil {
 			log.Printf("Error decoding chirp parameters: %s", err)
@@ -37,7 +52,7 @@ func handlePostChirps(db *database.DB) http.Handler {
 
 		// Chirp has valid length, proceed to clean it up
 		body := cleanBadWords(strings.TrimSpace(params.Body))
-		chirp, err := db.CreateChirp(body)
+		chirp, err := db.CreateChirp(body, authorId)
 		if err != nil {
 			log.Printf("Database error when creating chirp: %v", err)
 			respondWithError(w, 500, "Error handling request", err)
@@ -75,6 +90,41 @@ func handleGetChirp(db *database.DB) http.Handler {
 		}
 
 		respondWithJSON(w, 200, chirp)
+	})
+}
+
+func handleDeleteChirp(db *database.DB, jwtSecret []byte) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rid := getRequestID(w)
+
+		tokenString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		idStr, err := checkUserAuthenticated(tokenString, jwtSecret)
+		log.Println(rid, "handleDeleteChirp for AuthorId", idStr, tokenString)
+		if err != nil {
+			respondWithError(w, 401, "Authentication failed", err)
+			return
+		}
+
+		authorId, err := strconv.Atoi(idStr)
+		if err != nil {
+			respondWithError(w, 401, "Given user ID is not a number", err)
+			return
+		}
+
+		chirpId, err := strconv.Atoi(r.PathValue("id"))
+		if err != nil {
+			respondWithError(w, 401, "Given chirp ID is not a number", err)
+			return
+		}
+
+		chirp, err := db.GetChirp(chirpId)
+		if err != nil {
+			respondWithError(w, 404, "Couldn't retrieve chirp", err)
+		}
+		if chirp.AuthorId != authorId {
+			respondWithError(w, 403, "User not authenticated to delete this chirp", nil)
+		}
+		w.WriteHeader(200)
 	})
 }
 

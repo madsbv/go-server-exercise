@@ -34,7 +34,6 @@ func handlePostPolkaWebhooks(db *database.DB, polkaSecret string) http.Handler {
 			return
 		}
 
-		// TODO
 		auth := true
 
 		if tokenString != polkaSecret && auth {
@@ -47,6 +46,7 @@ func handlePostPolkaWebhooks(db *database.DB, polkaSecret string) http.Handler {
 			respondWithError(w, 404, "User not found", err)
 			return
 		}
+
 		log.Println(rid, "Upgraded user", params.Data.UserId)
 		w.WriteHeader(200)
 		return

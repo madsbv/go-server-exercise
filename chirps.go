@@ -70,7 +70,6 @@ func handleGetAllChirps(db *database.DB) http.Handler {
 			log.Println("Error getting list of chirps")
 			respondWithError(w, 500, "Error handling request", err)
 		}
-
 		if s := r.URL.Query().Get("author_id"); len(s) > 0 {
 			authorId, err := strconv.Atoi(s)
 			if err != nil {
@@ -83,6 +82,10 @@ func handleGetAllChirps(db *database.DB) http.Handler {
 				}
 			}
 			chirps = authorChirps
+		}
+
+		if r.URL.Query().Get("sort") == "desc" {
+			slices.Reverse(chirps)
 
 		}
 

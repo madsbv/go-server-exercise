@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 const expirationAccessSeconds = 60 * 60            // 1 hour

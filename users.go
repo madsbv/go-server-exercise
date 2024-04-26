@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 func handlePostUsers(db *database.DB) http.Handler {

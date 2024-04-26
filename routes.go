@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 func initRoutes(db *database.DB, apiCfg *apiConfig, filepathRoot string) *http.ServeMux {

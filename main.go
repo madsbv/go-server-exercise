@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/joho/godotenv"
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 func main() {

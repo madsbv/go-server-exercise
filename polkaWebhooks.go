@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 func handlePostPolkaWebhooks(db *database.DB, polkaSecret string) http.Handler {

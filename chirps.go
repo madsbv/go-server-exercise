@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/madsbv/boot-dev-go-server/internal/database"
+	"github.com/madsbv/go-server-exercise/internal/database"
 )
 
 type Chirp = database.Chirp

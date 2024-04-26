@@ -1,4 +1,4 @@
-module github.com/madsbv/boot-dev-go-server
+module github.com/madsbv/go-server-exercise
 
 go 1.22.1
 
